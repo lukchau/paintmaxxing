@@ -95,10 +95,12 @@ class PaintWidget(QWidget):
         width_scale = event.size().width() / self.size().width()
         height_scale = event.size().height() / self.size().height()
 
-        for i in range(len(self.lines_buffer)):
-            self.lines_buffer[i] = [QPoint(int(p.x() * width_scale), int(p.y() * height_scale)) for p in self.lines_buffer[i]]
+        self.lines_buffer = [
+            [QPoint(int(p.x() * width_scale), int(p.y() * height_scale)) for p in line]
+            for line in self.lines_buffer
+        ]
 
-        super().resizeEvent(event)  
+        super().resizeEvent(event)
 
 
 if __name__ == "__main__":
