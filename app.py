@@ -14,10 +14,10 @@ class PaintWidget(QWidget):
         Создает список линий и устанавливает флаг рисования в False
         """
         super().__init__()
-        self.lines = []  # Список линий
-        self.drawing = False  # Флаг для отслеживания состояния рисования
-        self.undo_stack = []  # Стек для отмены действий
-        self.redo_stack = []  # Стек для повтора действий
+        self.lines_buffer = []  
+        self.drawing = False  
+        self.undo_stack = []  
+        self.redo_stack = []  
 
         # Настройка сочетаний клавиш для отмены и повтора
         self.undo_shortcut = QShortcut(QKeySequence("Ctrl+Z"), self)
@@ -32,7 +32,7 @@ class PaintWidget(QWidget):
         Начинает новую линию, если нажата левая кнопка мыши
         """
         if event.button() == Qt.LeftButton:
-            self.lines.append([event.pos()])  # Начало линии
+            self.lines_buffer.append([event.pos()])  # Начало линии
             self.drawing = True  
             self.update()  
 
@@ -42,7 +42,7 @@ class PaintWidget(QWidget):
         Добавляет текущую позицию мыши в линию, когда пользователь рисует
         """
         if self.drawing:  # Добавление текущего положения при рисовании
-            self.lines[-1].append(event.pos())  # Добавление точки в линию
+            self.lines_buffer[-1].append(event.pos())  # Добавление точки в линию
             self.update()
 
     def mouseReleaseEvent(self, event):
@@ -52,7 +52,7 @@ class PaintWidget(QWidget):
         """
         if event.button() == Qt.LeftButton:
             self.drawing = False  
-            self.undo_stack.append(self.lines.copy())  # Сохраняем текущее состояние для отмены
+            self.undo_stack.append(self.lines_buffer.copy())  # Сохраняем текущее состояние для отмены
             self.redo_stack.clear()  # Очищаем стек повтора при новом действии
 
     def paintEvent(self, event):
@@ -63,7 +63,7 @@ class PaintWidget(QWidget):
         qp = QPainter(self)
         qp.setPen(QPen(Qt.black, 2, Qt.SolidLine))
 
-        for line in self.lines:
+        for line in self.lines_buffer:
             for i in range(len(line) - 1):
                 qp.drawLine(line[i], line[i + 1])  # Рисование линии между точками
 
@@ -74,8 +74,8 @@ class PaintWidget(QWidget):
         Отмена последнего действия
         """
         if self.undo_stack:
-            self.redo_stack.append(self.lines.copy())  # Сохраняем текущее состояние для повтора
-            self.lines = self.undo_stack.pop()  # Восстанавливаем предыдущее состояние
+            self.redo_stack.append(self.lines_buffer.copy())  # Сохраняем текущее состояние для повтора
+            self.lines_buffer = self.undo_stack.pop()  # Восстанавливаем предыдущее состояние
             self.update()  
 
     def redo(self):
@@ -83,8 +83,8 @@ class PaintWidget(QWidget):
         Повтор последнего отмененного действия
         """
         if self.redo_stack:
-            self.undo_stack.append(self.lines.copy())  # Сохраняем текущее состояние для отмены
-            self.lines = self.redo_stack.pop()  # Восстанавливаем состояние из стека повтора
+            self.undo_stack.append(self.lines_buffer.copy())  # Сохраняем текущее состояние для отмены
+            self.lines_buffer = self.redo_stack.pop()  # Восстанавливаем состояние из стека повтора
             self.update()
 
     def resizeEvent(self, event):
@@ -95,8 +95,8 @@ class PaintWidget(QWidget):
         width_scale = event.size().width() / self.size().width()
         height_scale = event.size().height() / self.size().height()
 
-        for i in range(len(self.lines)):
-            self.lines[i] = [QPoint(int(p.x() * width_scale), int(p.y() * height_scale)) for p in self.lines[i]]
+        for i in range(len(self.lines_buffer)):
+            self.lines_buffer[i] = [QPoint(int(p.x() * width_scale), int(p.y() * height_scale)) for p in self.lines_buffer[i]]
 
         super().resizeEvent(event)  
 
