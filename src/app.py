@@ -3,6 +3,7 @@ from PyQt5.QtWidgets import QWidget, QApplication, QShortcut
 from PyQt5.QtGui import QPainter, QPen, QKeySequence
 from PyQt5.QtCore import Qt, QPoint
 
+
 class PaintWidget(QWidget):
     """
     Класс PaintWidget представляет собой окно для рисования, позволяющее пользователю рисовать произвольные линии с помощью мыши
@@ -16,7 +17,7 @@ class PaintWidget(QWidget):
         super().__init__()
         self.lines_buffer = []  
         self.drawing = False  
-        self.undo_stack = []  
+        self.undo_stack = [[]]
         self.redo_stack = []  
 
         # Настройка сочетаний клавиш для отмены и повтора
@@ -51,8 +52,8 @@ class PaintWidget(QWidget):
         Завершает рисование, если была отпущена левая кнопка мыши
         """
         if event.button() == Qt.LeftButton:
-            self.drawing = False  
-            self.undo_stack.append(self.lines_buffer.copy())  # Сохраняем текущее состояние для отмены
+            self.drawing = False
+            self.undo_stack.append(self.lines_buffer[:])  # Сохраняем текущее состояние для отмены
             self.redo_stack.clear()  # Очищаем стек повтора при новом действии
 
     def paintEvent(self, event):
@@ -74,7 +75,7 @@ class PaintWidget(QWidget):
         Отмена последнего действия
         """
         if self.undo_stack:
-            self.redo_stack.append(self.lines_buffer.copy())  # Сохраняем текущее состояние для повтора
+            self.redo_stack.append(self.lines_buffer[:])  # Сохраняем текущее состояние для повтора
             self.lines_buffer = self.undo_stack.pop()  # Восстанавливаем предыдущее состояние
             self.update()  
 
@@ -83,7 +84,7 @@ class PaintWidget(QWidget):
         Повтор последнего отмененного действия
         """
         if self.redo_stack:
-            self.undo_stack.append(self.lines_buffer.copy())  # Сохраняем текущее состояние для отмены
+            self.undo_stack.append(self.lines_buffer[:])  # Сохраняем текущее состояние для отмены
             self.lines_buffer = self.redo_stack.pop()  # Восстанавливаем состояние из стека повтора
             self.update()
 
