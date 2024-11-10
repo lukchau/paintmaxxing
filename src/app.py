@@ -1,6 +1,6 @@
 import sys
 import random
-from PyQt5.QtWidgets import QMainWindow, QApplication, QShortcut, QMenuBar, QAction
+from PyQt5.QtWidgets import QMainWindow, QApplication, QShortcut, QMenuBar, QAction, QInputDialog, QColorDialog
 from PyQt5.QtGui import QPainter, QPen, QKeySequence
 from PyQt5.QtCore import Qt, QPoint
 
@@ -40,7 +40,9 @@ class PaintWidget(QMainWindow):
         Начинает новую линию, если нажата левая кнопка мыши
         """
         if event.button() == Qt.LeftButton:
-            self.lines_buffer.append([event.pos()])  # Начало линии
+            # Новый QPen с текущими настройками
+            new_pen = QPen(self.current_pen.color(), self.current_pen.width(), self.current_pen.style())
+            self.lines_buffer.append(([], new_pen))  # Новая линия 
             self.drawing = True  
             self.update()  
 
@@ -51,7 +53,7 @@ class PaintWidget(QMainWindow):
         """
         if self.drawing:
             if self.current_tool == "Линия":
-                self.lines_buffer[-1].append(event.pos())  # Добавление точки в линию
+                self.lines_buffer[-1][0].append(event.pos())  # Добавление точки в линию
             elif self.current_tool == "Граффити":
                 self.spray(event.pos())
             self.update()
@@ -72,14 +74,14 @@ class PaintWidget(QMainWindow):
         Отрисовка линий на основе точек
         """
         qp = QPainter(self)
-        qp.setPen(self.current_pen)
-
-        for line in self.lines_buffer:
+        for line, pen in self.lines_buffer:
+            qp.setPen(pen)  # Текущие настройки
             for i in range(len(line) - 1):
                 qp.drawLine(line[i], line[i + 1])  # Рисование линии между точками
 
         qp.end()
 
+        
     def spray(self, position):
         """
         Симуляция эффекта граффити путем рисования случайных точек вокруг курсора
@@ -91,7 +93,7 @@ class PaintWidget(QMainWindow):
             offset_x = random.randint(-radius, radius)
             offset_y = random.randint(-radius, radius)
             if offset_x**2 + offset_y**2 <= radius**2:
-                self.lines_buffer[-1].append(QPoint(position.x() + offset_x, position.y() + offset_y))
+                self.lines_buffer[-1][0].append(QPoint(position.x() + offset_x, position.y() + offset_y))
 
     def undo(self):
         """
@@ -150,10 +152,8 @@ class MenuBar(QMenuBar):
         self.eraser_menu = self.addMenu("Ластик")
         self.figures_menu = self.addMenu("Фигуры")
         # TODO: добавить фигуры (круг, квадрат, треугольник)
-        self.color_menu = self.addMenu("Цвет")
-        # TODO: добавить выбор цвета
-        self.thickness_menu = self.addMenu("Толщина")
-        # TODO: добавить выбор толщины
+        self.color_thickness_menu = self.addMenu("Цвет и Толщина")
+        # TODO: добавить выбор цвета и толщины
 
         self.line_tool = LineTool(self)
         self.graffiti_tool = GraffitiTool(self)
@@ -164,14 +164,34 @@ class MenuBar(QMenuBar):
         self.line_tool.triggered.connect(self.on_line_tool_triggered)
         self.graffiti_tool.triggered.connect(self.on_graffiti_tool_triggered)
 
+        self.color_action = QAction("Цвет", self)
+        self.color_action.triggered.connect(self.on_color_menu_triggered)
+        self.color_thickness_menu.addAction(self.color_action)
+
+        self.thickness_action = QAction("Толщина", self)
+        self.thickness_action.triggered.connect(self.on_thickness_menu_triggered)
+        self.color_thickness_menu.addAction(self.thickness_action)
+
+
     def on_line_tool_triggered(self):
         self.parent().current_tool = "Линия"
-        self.parent().current_pen = QPen(Qt.black, 2, Qt.SolidLine)  
+        self.parent().current_pen = QPen(self.parent().current_pen.color(), self.parent().current_pen.width(), Qt.SolidLine) 
 
     def on_graffiti_tool_triggered(self):
         self.parent().current_tool = "Граффити"
+        self.parent().current_pen = QPen(self.parent().current_pen.color(), self.parent().current_pen.width(), Qt.SolidLine)
         self.parent().drawing = True 
         self.parent().update() 
+    
+    def on_color_menu_triggered(self):
+        color = QColorDialog.getColor()
+        if color.isValid():
+            self.parent().current_pen.setColor(color)
+
+    def on_thickness_menu_triggered(self):
+        thickness, ok = QInputDialog.getInt(self, "Толщина", "Введите толщину:")
+        if ok:
+            self.parent().current_pen.setWidth(thickness)
 
 
 if __name__ == "__main__":
