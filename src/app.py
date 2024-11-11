@@ -1,6 +1,6 @@
 import sys
 import random
-from PyQt5.QtWidgets import QMainWindow, QApplication, QShortcut, QMenuBar, QAction, QInputDialog, QColorDialog
+from PyQt5.QtWidgets import QMainWindow, QApplication, QShortcut, QMenuBar, QAction, QInputDialog, QColorDialog, QFileDialog
 from PyQt5.QtGui import QPainter, QPen, QKeySequence
 from PyQt5.QtCore import Qt, QPoint
 
@@ -122,11 +122,22 @@ class PaintWidget(QMainWindow):
         height_scale = event.size().height() / self.size().height()
 
         self.lines_buffer = [
-            [QPoint(int(p.x() * width_scale), int(p.y() * height_scale)) for p in line]
+            ([QPoint(int(p.x() * width_scale), int(p.y() * height_scale)) for p in line[0]], line[1])
             for line in self.lines_buffer
         ]
 
         super().resizeEvent(event)
+    
+    def save_image(self, file_name, format, exclude_menu=False):
+        if exclude_menu:
+            drawing_area = self.geometry()
+            drawing_area.setTop(drawing_area.top() + self.menubar.height())  
+
+            image = self.grab(drawing_area)
+        else:
+            image = self.grab(Qt.CopyAllAttributes)  
+
+        image.save(file_name, format)
 
 
 class ToolAction(QAction):
@@ -147,7 +158,12 @@ class MenuBar(QMenuBar):
         super().__init__(parent)
 
         self.file_menu = self.addMenu("Файл")
-        # TODO: добавить сохранение и загрузку
+        self.save_as_menu = self.file_menu.addMenu("Сохранить как")
+        self.save_as_jpg_action = QAction("JPG", self)
+        self.save_as_png_action = QAction("PNG", self)
+        self.save_as_menu.addAction(self.save_as_jpg_action)
+        self.save_as_menu.addAction(self.save_as_png_action)
+
         self.tools_menu = self.addMenu("Инструменты")
         self.eraser_menu = self.addMenu("Ластик")
         self.figures_menu = self.addMenu("Фигуры")
@@ -172,6 +188,9 @@ class MenuBar(QMenuBar):
         self.thickness_action.triggered.connect(self.on_thickness_menu_triggered)
         self.color_thickness_menu.addAction(self.thickness_action)
 
+        self.save_as_jpg_action.triggered.connect(self.on_save_as_jpg_triggered)
+        self.save_as_png_action.triggered.connect(self.on_save_as_png_triggered)
+
 
     def on_line_tool_triggered(self):
         self.parent().current_tool = "Линия"
@@ -193,6 +212,18 @@ class MenuBar(QMenuBar):
         if ok:
             self.parent().current_pen.setWidth(thickness)
 
+    def on_save_as_jpg_triggered(self):
+        file_name, _ = QFileDialog.getSaveFileName(self, "Сохранить как", "", "JPG Файл (*.jpg)")
+        if file_name:
+            self.parent().save_image(file_name, "jpg", exclude_menu=True)
+
+    def on_save_as_png_triggered(self):
+        file_name, _ = QFileDialog.getSaveFileName(self, "Сохранить как", "", "PNG Файл (*.png)")
+        if file_name:
+            self.parent().save_image(file_name, "png", exclude_menu=True)
+
+    def on_file_menu_triggered(self):
+        self.save_as_menu.show()
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
