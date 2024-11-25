@@ -1,6 +1,7 @@
 import sys
 import random
-from PyQt5.QtWidgets import QMainWindow, QApplication, QShortcut, QToolBar, QAction, QInputDialog, QColorDialog, QFileDialog, QVBoxLayout, QWidget, QLabel, QSpinBox, QHBoxLayout
+import os
+from PyQt5.QtWidgets import QMainWindow, QApplication, QShortcut, QToolBar, QAction, QInputDialog, QColorDialog, QFileDialog, QVBoxLayout, QWidget, QLabel, QSlider, QHBoxLayout, QMessageBox
 from PyQt5.QtGui import QPainter, QPen, QKeySequence, QImage, QPixmap
 from PyQt5.QtCore import Qt, QPoint, QRect, QSize
 
@@ -38,10 +39,12 @@ class PaintWidget(QMainWindow):
         self.redo_shortcut.activated.connect(self.redo)
 
         self.zoom_level = 100
-        self.zoom_spinbox = QSpinBox()
-        self.zoom_spinbox.setRange(10, 500)
-        self.zoom_spinbox.setValue(self.zoom_level)
-        self.zoom_spinbox.valueChanged.connect(self.on_zoom_changed)
+        self.zoom_slider = QSlider(Qt.Horizontal)
+        self.zoom_slider.setRange(10, 500)
+        self.zoom_slider.setValue(self.zoom_level)
+        self.zoom_slider.valueChanged.connect(self.on_zoom_changed)
+
+        self.zoom_label = QLabel(f"Зум: {self.zoom_level}%")
 
         self.offset = QPoint(0, 0)
         self.panning = False
@@ -82,14 +85,13 @@ class PaintWidget(QMainWindow):
         self.redo_action.triggered.connect(self.redo)
 
     def init_zoom_control(self):
-        zoom_label = QLabel("Зум:")
         zoom_layout = QHBoxLayout()
-        zoom_layout.addWidget(zoom_label)
-        zoom_layout.addWidget(self.zoom_spinbox)
+        zoom_layout.addWidget(self.zoom_label)
+        zoom_layout.addWidget(self.zoom_slider)
 
         zoom_widget = QWidget()
         zoom_widget.setLayout(zoom_layout)
-        zoom_widget.setFixedWidth(150)
+        zoom_widget.setFixedWidth(300)
 
         self.statusBar().addPermanentWidget(zoom_widget)
 
@@ -230,17 +232,22 @@ class PaintWidget(QMainWindow):
             self.current_pen.setWidth(thickness)
 
     def on_save_as_jpg_triggered(self):
-        file_name, _ = QFileDialog.getSaveFileName(self, "Сохранить как", "", "JPG Файл (*.jpg)")
+        file_name, _ = QFileDialog.getSaveFileName(self, "Сохранить как", self.get_downloads_folder(), "JPG Файл (*.jpg)")
         if file_name:
             self.save_image(file_name, "jpg")
+            return True
+        return False
 
     def on_save_as_png_triggered(self):
-        file_name, _ = QFileDialog.getSaveFileName(self, "Сохранить как", "", "PNG Файл (*.png)")
+        file_name, _ = QFileDialog.getSaveFileName(self, "Сохранить как", self.get_downloads_folder(), "PNG Файл (*.png)")
         if file_name:
             self.save_image(file_name, "png")
+            return True
+        return False
 
     def on_zoom_changed(self, value):
         self.zoom_level = value
+        self.zoom_label.setText(f"Зум: {self.zoom_level}%")
         if self.zoom_level == 100:
             self.offset = self.original_offset
         self.update()
@@ -254,6 +261,64 @@ class PaintWidget(QMainWindow):
             int((pos.y() - self.offset.y()) / (self.zoom_level / 100.0))
         )
         return adjusted_pos
+
+    def get_downloads_folder(self):
+        """
+        Получить путь к папке "загрузки"
+        """
+        return os.path.join(os.path.expanduser("~"), "Downloads")
+
+    def closeEvent(self, event):
+        """
+        Обработка события закрытия окна
+        """
+        msg_box = QMessageBox(self)
+        msg_box.setWindowTitle('Сохранить')
+        msg_box.setText("Вы хотите сохранить рисунок перед закрытием?")
+        msg_box.setStandardButtons(QMessageBox.Yes | QMessageBox.No | QMessageBox.Cancel)
+
+        yes_button = msg_box.button(QMessageBox.Yes)
+        yes_button.setText("Да")
+        no_button = msg_box.button(QMessageBox.No)
+        no_button.setText("Нет")
+        cancel_button = msg_box.button(QMessageBox.Cancel)
+        cancel_button.setText("Отмена")
+
+        reply = msg_box.exec_()
+
+        if reply == QMessageBox.Yes:
+            format_msg_box = QMessageBox(self)
+            format_msg_box.setWindowTitle('Выберите формат')
+            format_msg_box.setText("Выберите формат для сохранения:")
+            format_msg_box.setStandardButtons(QMessageBox.Save | QMessageBox.Cancel)
+
+            save_button = format_msg_box.button(QMessageBox.Save)
+            save_button.setText("Сохранить как JPG")
+            cancel_button = format_msg_box.button(QMessageBox.Cancel)
+            cancel_button.setText("Отмена")
+
+            format_msg_box.addButton("Сохранить как PNG", QMessageBox.AcceptRole)
+
+            format_reply = format_msg_box.exec_()
+
+            if format_reply == QMessageBox.Save:
+                if not self.on_save_as_jpg_triggered():
+                    event.ignore()
+                    return
+            elif format_msg_box.clickedButton().text() == "Сохранить как PNG":
+                if not self.on_save_as_png_triggered():
+                    event.ignore()
+                    return
+            else:
+                event.ignore()
+                return
+
+            event.accept()
+        elif reply == QMessageBox.No:
+            event.accept()
+        else:
+            event.ignore()
+
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
