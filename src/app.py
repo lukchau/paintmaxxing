@@ -1,9 +1,12 @@
 import sys
 import random
 import os
-from PyQt5.QtWidgets import QMainWindow, QApplication, QShortcut, QToolBar, QAction, QInputDialog, QColorDialog, QFileDialog, QVBoxLayout, QWidget, QLabel, QSlider, QHBoxLayout, QMessageBox
-from PyQt5.QtGui import QPainter, QPen, QKeySequence, QImage, QPixmap, QIcon
-from PyQt5.QtCore import Qt, QPoint, QRect, QSize
+from PyQt5.QtWidgets import QMainWindow, QApplication, QShortcut, QToolBar, QAction, QInputDialog, QColorDialog, \
+    QFileDialog, QVBoxLayout, QWidget, QLabel, QSlider, QHBoxLayout, QMessageBox, QDialog, QFormLayout, QSpinBox, \
+    QDialogButtonBox
+from PyQt5.QtGui import QPainter, QPen, QKeySequence, QImage, QPixmap, QIcon, QTabletEvent
+from PyQt5.QtCore import Qt, QPoint, QRect, QSize, QPointF
+
 
 class PaintWidget(QMainWindow):
     """
@@ -36,6 +39,9 @@ class PaintWidget(QMainWindow):
         self.redo_stack = []
 
         self.current_pen = QPen(Qt.black, 2, Qt.SolidLine)
+        self.min_thickness = 1  # Минимальная толщина пера
+        self.max_thickness = 10  # Максимальная толщина пера
+
         self.current_tool = "Линия"  # Дифолтный инструмент
 
         # Настройка сочетаний клавиш для отмены и повтора
@@ -65,6 +71,7 @@ class PaintWidget(QMainWindow):
 
     def init_toolbar(self):
         self.line_tool = QAction("Линия", self)
+        self.eraser_action = QAction("Ластик", self)
         self.graffiti_tool = QAction("Граффити", self)
         self.color_action = QAction("Цвет", self)
         self.thickness_action = QAction("Толщина", self)
@@ -74,6 +81,7 @@ class PaintWidget(QMainWindow):
         self.redo_action = QAction("Повторить", self)
 
         self.toolbar.addAction(self.line_tool)
+        self.toolbar.addAction(self.eraser_action)
         self.toolbar.addAction(self.graffiti_tool)
         self.toolbar.addAction(self.color_action)
         self.toolbar.addAction(self.thickness_action)
@@ -83,6 +91,7 @@ class PaintWidget(QMainWindow):
         self.toolbar.addAction(self.redo_action)
 
         self.line_tool.triggered.connect(self.on_line_tool_triggered)
+        self.eraser_action.triggered.connect(self.on_eraser_tool_triggered)
         self.graffiti_tool.triggered.connect(self.on_graffiti_tool_triggered)
         self.color_action.triggered.connect(self.on_color_menu_triggered)
         self.thickness_action.triggered.connect(self.on_thickness_menu_triggered)
@@ -102,17 +111,83 @@ class PaintWidget(QMainWindow):
 
         self.statusBar().addPermanentWidget(zoom_widget)
 
+    def tabletEvent(self, event: QTabletEvent):
+        """
+        Обработка событий планшета
+        """
+        position = event.posF()  # Используем QPointF для работы с дробными координатами
+        if event.type() == QTabletEvent.TabletPress:
+            if self.current_tool == "Ластик":
+                self.last_erase_position = None  # Сбрасываем предыдущую позицию
+                self.erase(position)  # Начинаем стирать при нажатии
+            else:
+                self.start_new_line(position, event.pressure())
+
+        elif event.type() == QTabletEvent.TabletMove:
+            if self.current_tool == "Ластик":
+                if self.last_erase_position:
+                    # Проверяем расстояние между точками, чтобы уменьшить частоту стирания
+                    dist = ((position.x() - self.last_erase_position.x()) ** 2 +
+                            (position.y() - self.last_erase_position.y()) ** 2) ** 0.5
+                    if dist < 10:  # Минимальное расстояние между точками стирания
+                        return
+                self.last_erase_position = position
+                self.erase(position)  # Продолжаем стирать при движении
+            else:
+                self.add_to_line(position, event.pressure())
+
+        elif event.type() == QTabletEvent.TabletRelease:
+            if self.current_tool != "Ластик":
+                self.end_current_line()  # Завершаем линию только для рисования
+
+        event.accept()
+
+    def start_new_line(self, position, pressure):
+        """
+        Начало новой линии с настройкой толщины пера
+        """
+        self.drawing = True
+        self.current_line = []
+        thickness = self.calculate_thickness(pressure)
+        self.current_pen.setWidth(thickness)
+        self.lines_buffer.append((self.current_line, QPen(self.current_pen)))
+
+    def add_to_line(self, position, pressure):
+        """
+        Добавление точки в текущую линию
+        """
+        if self.drawing:
+            thickness = self.calculate_thickness(pressure)
+            self.current_pen.setWidth(thickness)
+            self.lines_buffer[-1][0].append(position)
+            self.update()
+
+    def end_current_line(self):
+        """
+        Завершение текущей линии
+        """
+        self.drawing = False
+
+    def calculate_thickness(self, pressure):
+        """
+        Вычисление толщины линии на основе силы нажатия
+        """
+        return int(self.min_thickness + (self.max_thickness - self.min_thickness) * pressure)
+
     def mousePressEvent(self, event):
         """
         Обработка события нажатия левой кнопки мыши
-        Начинает новую линию, если нажата левая кнопка мыши
+        Начинает новую линию или стирание в зависимости от текущего инструмента
         """
         if event.button() == Qt.LeftButton and event.y() > self.toolbar.height():
-            # Новый QPen с текущими настройками
-            new_pen = QPen(self.current_pen.color(), self.current_pen.width(), self.current_pen.style())
-            self.lines_buffer.append(([], new_pen))  # Новая линия
-            self.drawing = True
-            self.update()
+            if self.current_tool == "Ластик":
+                self.erase(event.pos())  # Стираем, если выбран ластик
+            else:
+                new_pen = QPen(self.current_pen.color(), self.current_pen.width(), self.current_pen.style())
+                self.start_new_line(event.pos(), 1.0)
+                self.lines_buffer.append(([], new_pen))
+                self.drawing = True
+                self.update()
         elif event.button() == Qt.RightButton:
             self.panning = True
             self.pan_start = event.pos()
@@ -120,11 +195,13 @@ class PaintWidget(QMainWindow):
     def mouseMoveEvent(self, event):
         """
         Обработка события движения мыши
-        Добавляет текущую позицию мыши в линию, когда пользователь рисует
+        Добавляет точку в линию или стирает в зависимости от текущего инструмента
         """
-        if self.drawing and event.y() > self.toolbar.height():
+        if self.current_tool == "Ластик" and event.y() > self.toolbar.height():
+            self.erase(event.pos())  # Стираем, если выбран ластик
+        elif self.drawing and event.y() > self.toolbar.height():
             if self.current_tool == "Линия":
-                self.lines_buffer[-1][0].append(self.adjust_mouse_position(event.pos()))  # Добавление точки в линию
+                self.lines_buffer[-1][0].append(self.adjust_mouse_position(event.pos()))
             elif self.current_tool == "Граффити":
                 self.spray(self.adjust_mouse_position(event.pos()))
             self.update()
@@ -136,15 +213,18 @@ class PaintWidget(QMainWindow):
 
     def mouseReleaseEvent(self, event):
         """
-        Обработка события отпускания мыши
-        Завершает рисование, если была отпущена левая кнопка мыши
+        Обработка события отпускания кнопки мыши
+        Завершаем рисование или стирание в зависимости от инструмента
         """
         if event.button() == Qt.LeftButton and event.y() > self.toolbar.height():
-            self.drawing = False
-            self.undo_stack.append(self.lines_buffer[:])  # Сохраняем текущее состояние для отмены
-            self.redo_stack.clear()  # Очищаем стек повтора при новом действии
+            if self.current_tool == "Ластик":
+                self.panning = False  # Выключаем панорамирование после ластика
+            else:
+                self.drawing = False
+                self.undo_stack.append(self.lines_buffer[:])  # Сохраняем текущее состояние для отмены
+                self.redo_stack.clear()  # Очищаем стек повтора
         elif event.button() == Qt.RightButton:
-            self.panning = False
+            self.panning = False  # Завершаем панорамирование при отпускании правой кнопки
 
     def paintEvent(self, event):
         """
@@ -152,18 +232,73 @@ class PaintWidget(QMainWindow):
         Отрисовка линий на основе точек
         """
         qp = QPainter(self)
-        qp.fillRect(self.rect(), Qt.lightGray)  # Заполнить фон серым цветом
+        qp.fillRect(self.rect(), Qt.lightGray)
         qp.translate(self.offset)
         qp.scale(self.zoom_level / 100.0, self.zoom_level / 100.0)
-        qp.fillRect(QRect(QPoint(0, 0), self.sheet_size), Qt.white)  # Заполнить лист белым цветом
+        qp.fillRect(QRect(QPoint(0, 0), self.sheet_size), Qt.white)
         drawing_area = QRect(0, 0, self.sheet_size.width(), self.sheet_size.height())
         qp.setClipRect(drawing_area)
+
         for line, pen in self.lines_buffer:
-            qp.setPen(pen)  # Текущие настройки
-            for i in range(len(line) - 1):
-                qp.drawLine(line[i], line[i + 1])  # Рисование линии между точками
+            qp.setPen(pen)
+            if line:
+                for i in range(len(line) - 1):
+                    qp.drawLine(line[i], line[i + 1])
 
         qp.end()
+
+    def erase(self, position):
+        """
+        Стирает часть линии в радиусе ластика, создавая разрыв
+        """
+        eraser_radius = 10
+        new_lines_buffer = []
+
+        for line, pen in self.lines_buffer:
+            new_line = []
+            for i in range(len(line) - 1):
+                start = line[i]
+                end = line[i + 1]
+
+                # Если сегмент пересекает радиус ластика
+                if self.segment_intersects_circle(start, end, position, eraser_radius):
+                    if new_line:  # Если есть незавершенная часть линии
+                        new_lines_buffer.append((new_line, pen))
+                    new_line = []  # Начинаем новую часть
+                else:
+                    new_line.append(start)
+
+            # Добавляем последнюю точку, если она осталась
+            if new_line:
+                new_line.append(line[-1])
+                new_lines_buffer.append((new_line, pen))
+
+        self.lines_buffer = [line for line in new_lines_buffer if len(line[0]) > 1]  # Убираем пустые линии
+        self.update()
+
+    def segment_intersects_circle(self, start, end, center, radius):
+        """
+        Проверяет, пересекает ли отрезок окружность
+        """
+        # Вектор от начала отрезка до конца
+        ab = end - start
+        ab_len_squared = ab.x() ** 2 + ab.y() ** 2
+        if ab_len_squared == 0:  # Начальная и конечная точка совпадают
+            return (center - start).manhattanLength() <= radius
+
+        # Вектор от начала отрезка до центра окружности
+        ac = center - start
+
+        # Проекция центра окружности на линию отрезка
+        projection_ratio = (ac.x() * ab.x() + ac.y() * ab.y()) / ab_len_squared
+        projection_ratio = max(0, min(1, projection_ratio))  # Ограничиваем в пределах отрезка
+        closest_point = QPointF(
+            start.x() + projection_ratio * ab.x(),
+            start.y() + projection_ratio * ab.y()
+        )
+
+        # Проверяем расстояние от ближайшей точки до центра окружности
+        return (closest_point - center).manhattanLength() <= radius
 
     def spray(self, position):
         """
@@ -222,6 +357,12 @@ class PaintWidget(QMainWindow):
         self.current_tool = "Линия"
         self.current_pen = QPen(self.current_pen.color(), self.current_pen.width(), Qt.SolidLine)
 
+    def on_eraser_tool_triggered(self):
+        """
+        Переключение на инструмент ластика
+        """
+        self.current_tool = "Ластик"
+
     def on_graffiti_tool_triggered(self):
         self.current_tool = "Граффити"
         self.current_pen = QPen(self.current_pen.color(), self.current_pen.width(), Qt.SolidLine)
@@ -234,9 +375,35 @@ class PaintWidget(QMainWindow):
             self.current_pen.setColor(color)
 
     def on_thickness_menu_triggered(self):
-        thickness, ok = QInputDialog.getInt(self, "Толщина", "Введите толщину:")
-        if ok:
-            self.current_pen.setWidth(thickness)
+        """
+        Диалог для настройки минимальной и максимальной толщины пера
+        """
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Настройка толщины линии")
+
+        layout = QFormLayout(dialog)
+
+        min_thickness_input = QSpinBox()
+        max_thickness_input = QSpinBox()
+
+        min_thickness_input.setRange(1, 100)  # Диапазон для минимальной толщины
+        max_thickness_input.setRange(1, 100)  # Диапазон для максимальной толщины
+
+        # Предустановленные значения
+        min_thickness_input.setValue(self.min_thickness)
+        max_thickness_input.setValue(self.max_thickness)
+
+        layout.addRow("Минимальная толщина:", min_thickness_input)
+        layout.addRow("Максимальная толщина:", max_thickness_input)
+
+        buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel, dialog)
+        buttons.accepted.connect(dialog.accept)
+        buttons.rejected.connect(dialog.reject)
+        layout.addWidget(buttons)
+
+        if dialog.exec() == QDialog.Accepted:
+            self.min_thickness = min_thickness_input.value()
+            self.max_thickness = max_thickness_input.value()
 
     def on_save_as_jpg_triggered(self):
         file_name, _ = QFileDialog.getSaveFileName(self, "Сохранить как", self.get_downloads_folder(), "JPG Файл (*.jpg)")
