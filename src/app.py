@@ -2,7 +2,7 @@ import sys
 import random
 import os
 from PyQt5.QtWidgets import QMainWindow, QApplication, QShortcut, QToolBar, QAction, QInputDialog, QColorDialog, QFileDialog, QVBoxLayout, QWidget, QLabel, QSlider, QHBoxLayout, QMessageBox
-from PyQt5.QtGui import QPainter, QPen, QKeySequence, QImage, QPixmap
+from PyQt5.QtGui import QPainter, QPen, QKeySequence, QImage, QPixmap, QIcon
 from PyQt5.QtCore import Qt, QPoint, QRect, QSize
 
 class PaintWidget(QMainWindow):
@@ -19,6 +19,13 @@ class PaintWidget(QMainWindow):
 
         self.setWindowTitle("Paintmaxxing")
         self.setStyleSheet("QMainWindow { background-color: #f0f0f0; }")
+
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        icons_dir = os.path.join(current_dir, "icons")
+
+        app_icon = QIcon(os.path.join(icons_dir, "icon_256x256.png"))
+
+        self.setWindowIcon(app_icon)
 
         self.toolbar = QToolBar(self)
         self.addToolBar(Qt.TopToolBarArea, self.toolbar)
@@ -322,6 +329,10 @@ class PaintWidget(QMainWindow):
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    icons_dir = os.path.join(current_dir, "icons")
+    app_icon = QIcon(os.path.join(icons_dir, "icon_256x256.png"))
+    QApplication.setWindowIcon(app_icon)
     widget = PaintWidget()
     widget.resize(800, 600)
     widget.show()
