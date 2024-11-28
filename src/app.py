@@ -25,9 +25,7 @@ from PyQt5.QtWidgets import (
 import sys
 import random
 import os
-<< << << < HEAD
-== == == =
->>>>>> > b6aa358237dc2edd83d08054c72ed81ab9e81014
+
 
 
 class PaintWidget(QMainWindow):
@@ -95,35 +93,60 @@ class PaintWidget(QMainWindow):
         self.init_palette()
 
     def init_toolbar(self):
+        # Создание инструментов
         self.line_tool = QAction("Линия", self)
         self.eraser_action = QAction("Ластик", self)
         self.graffiti_tool = QAction("Граффити", self)
-        self.thickness_action = QAction("Толщина", self)
         self.save_as_jpg_action = QAction("Сохранить как JPG", self)
         self.save_as_png_action = QAction("Сохранить как PNG", self)
         self.undo_action = QAction("Отменить", self)
         self.redo_action = QAction("Повторить", self)
 
+        # Добавление инструментов в тулбар
         self.toolbar.addAction(self.line_tool)
         self.toolbar.addAction(self.eraser_action)
         self.toolbar.addAction(self.graffiti_tool)
-        self.toolbar.addAction(self.thickness_action)
         self.toolbar.addAction(self.save_as_jpg_action)
         self.toolbar.addAction(self.save_as_png_action)
         self.toolbar.addAction(self.undo_action)
         self.toolbar.addAction(self.redo_action)
 
+        # Добавляем слайдер для толщины
+        self.thickness_slider = QSlider(Qt.Horizontal, self)
+        self.thickness_slider.setRange(1, 50)  # Устанавливаем фиксированный диапазон
+        self.thickness_slider.setValue(self.current_pen.width())  # Текущая толщина
+        self.thickness_slider.valueChanged.connect(self.on_thickness_slider_changed)
+
+        thickness_label = QLabel("Толщина:")
+        thickness_layout = QHBoxLayout()
+        thickness_layout.addWidget(thickness_label)
+        thickness_layout.addWidget(self.thickness_slider)
+
+        thickness_widget = QWidget()
+        thickness_widget.setLayout(thickness_layout)
+        thickness_widget.setFixedWidth(200)
+
+        self.toolbar.addWidget(thickness_widget)
+
+        self.color_picker_button = QPushButton("Выбор цвета", self)
+        self.color_picker_button.clicked.connect(self.on_color_picker_button_clicked)
+        self.toolbar.addWidget(self.color_picker_button)
+
+        # Подключение сигналов
         self.line_tool.triggered.connect(self.on_line_tool_triggered)
         self.eraser_action.triggered.connect(self.on_eraser_tool_triggered)
         self.graffiti_tool.triggered.connect(self.on_graffiti_tool_triggered)
-        self.thickness_action.triggered.connect(
-            self.on_thickness_menu_triggered)
-        self.save_as_jpg_action.triggered.connect(
-            self.on_save_as_jpg_triggered)
-        self.save_as_png_action.triggered.connect(
-            self.on_save_as_png_triggered)
+        self.save_as_jpg_action.triggered.connect(self.on_save_as_jpg_triggered)
+        self.save_as_png_action.triggered.connect(self.on_save_as_png_triggered)
         self.undo_action.triggered.connect(self.undo)
         self.redo_action.triggered.connect(self.redo)
+    def on_color_picker_button_clicked(self):
+        """
+        Обработчик для кнопки вызова палитры цветов.
+        """
+        color = QColorDialog.getColor(initial=self.current_pen.color(), parent=self, title="Выбор цвета")
+        if color.isValid():
+            self.current_pen.setColor(color)
 
     def init_palette(self):
         """
@@ -252,7 +275,7 @@ class PaintWidget(QMainWindow):
             self.update()
 
 
-== == == =
+
             if self.current_tool == "Ластик":
                 self.erase(event.pos())  # Стираем, если выбран ластик
             else:
@@ -262,7 +285,6 @@ class PaintWidget(QMainWindow):
                 self.lines_buffer.append(([], new_pen))
                 self.drawing = True
                 self.update()
->>>>>> > b6aa358237dc2edd83d08054c72ed81ab9e81014
         elif event.button() == Qt.RightButton:
             self.panning = True
             self.pan_start = event.pos()
@@ -279,9 +301,8 @@ class PaintWidget(QMainWindow):
                 # Добавление точки в линию
                 self.lines_buffer[-1][0].append(
                     self.adjust_mouse_position(event.pos()))
-=======
+
                 self.lines_buffer[-1][0].append(self.adjust_mouse_position(event.pos()))
->>>>>>> b6aa358237dc2edd83d08054c72ed81ab9e81014
             elif self.current_tool == "Граффити":
                 self.spray(self.adjust_mouse_position(event.pos()))
             self.update()
@@ -301,14 +322,12 @@ class PaintWidget(QMainWindow):
             # Сохраняем текущее состояние для отмены
             self.undo_stack.append(self.lines_buffer[:])
             self.redo_stack.clear()  # Очищаем стек повтора при новом действии
-=======
             if self.current_tool == "Ластик":
                 self.panning = False  # Выключаем панорамирование после ластика
             else:
                 self.drawing = False
                 self.undo_stack.append(self.lines_buffer[:])  # Сохраняем текущее состояние для отмены
                 self.redo_stack.clear()  # Очищаем стек повтора
->>>>>>> b6aa358237dc2edd83d08054c72ed81ab9e81014
         elif event.button() == Qt.RightButton:
             self.panning = False  # Завершаем панорамирование при отпускании правой кнопки
 
@@ -326,10 +345,9 @@ class PaintWidget(QMainWindow):
         )  # Заполнить лист белым цветом
         drawing_area = QRect(0, 0, self.sheet_size.width(),
                              self.sheet_size.height())
-=======
         qp.fillRect(QRect(QPoint(0, 0), self.sheet_size), Qt.white)
         drawing_area = QRect(0, 0, self.sheet_size.width(), self.sheet_size.height())
->>>>>>> b6aa358237dc2edd83d08054c72ed81ab9e81014
+
         qp.setClipRect(drawing_area)
 
         for line, pen in self.lines_buffer:
@@ -337,12 +355,11 @@ class PaintWidget(QMainWindow):
             for i in range(len(line) - 1):
                 # Рисование линии между точками
                 qp.drawLine(line[i], line[i + 1])
-=======
+
             qp.setPen(pen)
             if line:
                 for i in range(len(line) - 1):
                     qp.drawLine(line[i], line[i + 1])
->>>>>>> b6aa358237dc2edd83d08054c72ed81ab9e81014
 
         qp.end()
 
@@ -491,7 +508,7 @@ class PaintWidget(QMainWindow):
             self, "Толщина", "Введите толщину:")
         if ok:
             self.current_pen.setWidth(thickness)
-=======
+
         """
         Диалог для настройки минимальной и максимальной толщины пера
         """
@@ -521,7 +538,9 @@ class PaintWidget(QMainWindow):
         if dialog.exec() == QDialog.Accepted:
             self.min_thickness = min_thickness_input.value()
             self.max_thickness = max_thickness_input.value()
->>>>>>> b6aa358237dc2edd83d08054c72ed81ab9e81014
+    
+    def on_thickness_slider_changed(self, value):
+        self.current_pen.setWidth(value)
 
     def on_save_as_jpg_triggered(self):
         file_name, _ = QFileDialog.getSaveFileName(
