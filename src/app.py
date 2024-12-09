@@ -138,15 +138,13 @@ class PaintWidget(QMainWindow):
         min_thickness_label = QLabel("Мин. толщина:")
         self.min_thickness_slider = QSlider(Qt.Horizontal, self)
         self.min_thickness_slider.setRange(1, 50)
-        # По умолчанию минимальная толщина
-        self.min_thickness_slider.setValue(1)
+        self.min_thickness_slider.setValue(1)  # По умолчанию минимальная толщина
 
         # Слайдер для максимальной толщины
         max_thickness_label = QLabel("Макс. толщина:")
         self.max_thickness_slider = QSlider(Qt.Horizontal, self)
         self.max_thickness_slider.setRange(1, 50)
-        # По умолчанию максимальная толщина
-        self.max_thickness_slider.setValue(10)
+        self.max_thickness_slider.setValue(10)  # По умолчанию максимальная толщина
 
         # Добавляем элементы в макет
         thickness_menu_layout.addWidget(min_thickness_label)
@@ -165,35 +163,30 @@ class PaintWidget(QMainWindow):
 
         # Добавляем кнопку вызова палитры
         self.color_picker_button = QPushButton("Выбор цвета", self)
-        self.color_picker_button.clicked.connect(
-            self.on_color_picker_button_clicked)
+        self.color_picker_button.clicked.connect(self.on_color_picker_button_clicked)
         self.toolbar.addWidget(self.color_picker_button)
 
         # Подключение сигналов
         self.line_tool.triggered.connect(self.on_line_tool_triggered)
         self.eraser_action.triggered.connect(self.on_eraser_tool_triggered)
         self.graffiti_tool.triggered.connect(self.on_graffiti_tool_triggered)
-        self.save_as_jpg_action.triggered.connect(
-            self.on_save_as_jpg_triggered)
-        self.save_as_png_action.triggered.connect(
-            self.on_save_as_png_triggered)
+        self.save_as_jpg_action.triggered.connect(self.on_save_as_jpg_triggered)
+        self.save_as_png_action.triggered.connect(self.on_save_as_png_triggered)
         self.undo_action.triggered.connect(self.undo)
         self.redo_action.triggered.connect(self.redo)
 
         # Обработка сигналов слайдеров
-        self.min_thickness_slider.valueChanged.connect(
-            self.on_min_thickness_changed)
-        self.max_thickness_slider.valueChanged.connect(
-            self.on_max_thickness_changed)
-
+        self.min_thickness_slider.valueChanged.connect(self.on_min_thickness_changed)
+        self.max_thickness_slider.valueChanged.connect(self.on_max_thickness_changed)
+    
     def on_min_thickness_changed(self, value):
         """
         Обработчик изменения минимальной толщины.
         """
         print(f"Минимальная толщина изменена на: {value}")
         if value > self.max_thickness_slider.value():
-            self.max_thickness_slider.setValue(
-                value)  # Синхронизация слайдеров
+            self.max_thickness_slider.setValue(value)  # Синхронизация слайдеров
+        self.update_pen_thickness()  # Обновляем толщину пера
 
     def on_max_thickness_changed(self, value):
         """
@@ -201,8 +194,18 @@ class PaintWidget(QMainWindow):
         """
         print(f"Максимальная толщина изменена на: {value}")
         if value < self.min_thickness_slider.value():
-            self.min_thickness_slider.setValue(
-                value)  # Синхронизация слайдеров
+            self.min_thickness_slider.setValue(value)  # Синхронизация слайдеров
+        self.update_pen_thickness()  # Обновляем толщину пера
+
+
+
+    def update_pen_thickness(self):
+        """
+        Обновляет текущую толщину пера на основе слайдеров.
+        """
+        self.min_thickness = self.min_thickness_slider.value()
+        self.max_thickness = self.max_thickness_slider.value()
+        self.current_pen.setWidth(self.thickness)  # Обновляем толщину пера
 
     def on_color_picker_button_clicked(self):
         """
@@ -300,8 +303,8 @@ class PaintWidget(QMainWindow):
         """
         self.drawing = True
         self.current_line = []
-        thickness = self.calculate_thickness(pressure)
-        self.current_pen.setWidth(thickness)
+        self.thickness = self.calculate_thickness(pressure)
+        self.current_pen.setWidth(self.thickness)
         self.lines_buffer.append((self.current_line, QPen(self.current_pen)))
 
     def add_to_line(self, position, pressure):
