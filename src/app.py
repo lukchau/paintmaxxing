@@ -445,7 +445,7 @@ class PaintWidget(QMainWindow):
         """
         Стирает часть линии в радиусе ластика, создавая разрыв
         """
-        eraser_radius = 10
+        eraser_radius = self.current_pen.width()  # Используем текущую толщину пера для ластика
         new_lines_buffer = []
 
         for line, pen in self.lines_buffer:
@@ -471,6 +471,7 @@ class PaintWidget(QMainWindow):
             line for line in new_lines_buffer if len(line[0]) > 1
         ]  # Убираем пустые линии
         self.update()
+
 
     def segment_intersects_circle(self, start, end, center, radius):
         """
@@ -589,15 +590,17 @@ class PaintWidget(QMainWindow):
 
     def on_line_tool_triggered(self):
         self.current_tool = "Линия"
-        self.current_pen = QPen(
-            self.current_pen.color(), self.current_pen.width(), Qt.SolidLine
-        )
+        self.current_pen.setColor(Qt.black)  # Восстанавливаем цвет пера в черный
+        self.current_pen.setWidth(self.max_thickness)  # Восстанавливаем толщину пера
 
+        
     def on_eraser_tool_triggered(self):
         """
         Переключение на инструмент ластика
         """
         self.current_tool = "Ластик"
+        self.current_pen.setColor(Qt.white)  # Устанавливаем цвет ластика в белый
+
 
     def on_graffiti_tool_triggered(self):
         self.current_tool = "Граффити"
